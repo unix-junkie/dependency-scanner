@@ -30,9 +30,7 @@
 		<kotlin.version>1.6.21</kotlin.version>
 
 		<dokka.version>1.8.10</dokka.version>
-		<junit.version>5.9.2</junit.version>
-		<junit.platform.version>1.9.2</junit.platform.version>
-		<surefire.junit5.tree-reporter.version>1.1.0</surefire.junit5.tree-reporter.version>
+		<junit.version>4.13.2</junit.version>
 	</properties>
 
 	<dependencyManagement>
@@ -44,28 +42,18 @@
 			</dependency>
 			<dependency>
 				<groupId>org.jetbrains.kotlin</groupId>
-				<artifactId>kotlin-stdlib-jdk7</artifactId>
+				<artifactId>kotlin-test</artifactId>
 				<version>${kotlin.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>org.jetbrains.kotlin</groupId>
-				<artifactId>kotlin-stdlib-jdk8</artifactId>
+				<artifactId>kotlin-test-junit</artifactId>
 				<version>${kotlin.version}</version>
 			</dependency>
 			<dependency>
-				<groupId>me.fabriciorby</groupId>
-				<artifactId>maven-surefire-junit5-tree-reporter</artifactId>
-				<version>${surefire.junit5.tree-reporter.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>org.junit.jupiter</groupId>
-				<artifactId>junit-jupiter</artifactId>
+				<groupId>junit</groupId>
+				<artifactId>junit</artifactId>
 				<version>${junit.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>org.junit.platform</groupId>
-				<artifactId>junit-platform-suite-engine</artifactId>
-				<version>${junit.platform.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>org.assertj</groupId>
@@ -181,13 +169,6 @@
 			</plugin>
 			<plugin>
 				<artifactId>maven-surefire-plugin</artifactId>
-				<dependencies>
-					<dependency>
-						<groupId>me.fabriciorby</groupId>
-						<artifactId>maven-surefire-junit5-tree-reporter</artifactId>
-						<version>${surefire.junit5.tree-reporter.version}</version>
-					</dependency>
-				</dependencies>
 				<configuration>
 					<failIfNoTests>false</failIfNoTests>
 					<rerunFailingTestsCount>0</rerunFailingTestsCount>
@@ -197,27 +178,6 @@
 					<excludes>
 						<exclude>**/*IntegrationTest.*</exclude>
 					</excludes>
-
-					<statelessTestsetReporter implementation="org.apache.maven.plugin.surefire.extensions.junit5.JUnit5Xml30StatelessReporter">
-						<!-- Prefer @DisplayName & friends, if any. -->
-						<usePhrasedFileName>true</usePhrasedFileName>
-						<usePhrasedTestCaseClassName>true</usePhrasedTestCaseClassName>
-						<usePhrasedTestCaseMethodName>true</usePhrasedTestCaseMethodName>
-						<usePhrasedTestSuiteClassName>true</usePhrasedTestSuiteClassName>
-					</statelessTestsetReporter>
-					<!-- For the console output, use the tree reporter from
-						 https://github.com/fabriciorby/maven-surefire-junit5-tree-reporter. -->
-					<reportFormat>plain</reportFormat>
-					<consoleOutputReporter>
-						<disable>true</disable>
-					</consoleOutputReporter>
-					<statelessTestsetInfoReporter implementation="org.apache.maven.plugin.surefire.extensions.junit5.JUnit5StatelessTestsetInfoTreeReporter">
-						<!-- Prefer @DisplayName & friends, if any. -->
-						<usePhrasedFileName>true</usePhrasedFileName>
-						<usePhrasedClassNameInRunning>true</usePhrasedClassNameInRunning>
-						<!-- Avoid null's in *.txt summary -->
-						<usePhrasedClassNameInTestCaseSummary>false</usePhrasedClassNameInTestCaseSummary>
-					</statelessTestsetInfoReporter>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -328,16 +288,12 @@
 		</dependency>
 		<dependency>
 			<groupId>org.jetbrains.kotlin</groupId>
-			<artifactId>kotlin-stdlib-jdk8</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.junit.jupiter</groupId>
-			<artifactId>junit-jupiter</artifactId>
+			<artifactId>kotlin-test-junit</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>org.junit.platform</groupId>
-			<artifactId>junit-platform-suite-engine</artifactId>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
