@@ -3,6 +3,7 @@
 package com.github.unix_junkie.dependency_scanner
 
 import com.github.unix_junkie.dependency_scanner.ExitCode.ILLEGAL_ARGS
+import com.github.unix_junkie.dependency_scanner.ExitCode.PACKAGE_ROOT_NONEXISTENT
 import org.apache.tika.Tika
 import org.apache.tika.config.TikaConfig
 import java.io.File
@@ -23,17 +24,19 @@ fun main(vararg args: String) {
 
 		else -> {
 			println("Not a directory: $packageRoot")
-			exitProcess(ExitCode.PACKAGE_ROOT_NONEXISTENT)
+			exitProcess(PACKAGE_ROOT_NONEXISTENT)
 		}
 	}
 }
 
 private fun scanPackage(packageRoot: File) {
-	val tika = Tika(TikaConfig.getDefaultConfig())
-
-	scanDirectory(packageRoot).forEach { file ->
-		val type = tika.detect(file)
-		println("$file -> $type")
+	withContentDetector {
+		scanDirectory(packageRoot).filter { file ->
+			file.isExecutable || file.isLibrary
+		}.forEach { file ->
+			val type = contentDetector.detect(file)
+			println("$file -> $type")
+		}
 	}
 }
 
@@ -65,3 +68,11 @@ private fun usage() {
 
 private fun exitProcess(exitCode: ExitCode): Nothing =
 		exitProcess(exitCode.ordinal)
+
+private fun <T> withContentDetector(
+		contentDetector: Tika = Tika(TikaConfig.getDefaultConfig()),
+		action: ContentDetectorAware.() -> T
+): T =
+		object : ContentDetectorAware {
+			override val contentDetector: Tika = contentDetector
+		}.action()
