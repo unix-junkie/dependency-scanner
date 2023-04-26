@@ -31,6 +31,7 @@
 
 		<dokka.version>1.8.10</dokka.version>
 		<junit.version>4.13.2</junit.version>
+		<assertj.version>1.7.1</assertj.version>
 	</properties>
 
 	<dependencyManagement>
@@ -58,7 +59,7 @@
 			<dependency>
 				<groupId>org.assertj</groupId>
 				<artifactId>assertj-core</artifactId>
-				<version>3.24.2</version>
+				<version>${assertj.version}</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
