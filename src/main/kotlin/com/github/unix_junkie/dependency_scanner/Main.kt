@@ -10,9 +10,11 @@ import java.io.File
 import java.nio.charset.Charset
 import kotlin.system.exitProcess
 
-private val className = {}.javaClass.enclosingClass.name
+private val CLASS_NAME = {}.javaClass.enclosingClass.name
 
-private val processStreamCharset = Charset.defaultCharset()
+private val PROCESS_STREAM_CHARSET = Charset.defaultCharset()
+
+private val LDD_OUTPUT = Regex("""^\s*(\S+)\s*(?:=>\s*(not found|(\S.+?\S)))?(?:\s+\(\s*(?:\?|0x[0-9A-Fa-f]+)\s*\))?\s*$""")
 
 fun main(vararg args: String) {
 	if (args.size != 1) {
@@ -74,10 +76,10 @@ private fun listDependencies(file: File) {
 	val lddProcess = ProcessBuilder(ldd.toString(), file.toString()).start()
 	lddProcess.outputStream.close()
 	val dependencies = lddProcess.inputStream
-		.bufferedReader(processStreamCharset)
+		.bufferedReader(PROCESS_STREAM_CHARSET)
 		.readText()
 	val errorOutput = lddProcess.errorStream
-		.bufferedReader(processStreamCharset)
+		.bufferedReader(PROCESS_STREAM_CHARSET)
 		.readText()
 	println(dependencies)
 	if (errorOutput.isNotEmpty()) {
@@ -90,7 +92,7 @@ private fun listDependencies(file: File) {
 }
 
 private fun usage() {
-	println("Usage: $className [DIRECTORY]")
+	println("Usage: $CLASS_NAME [DIRECTORY]")
 }
 
 private fun exitProcess(exitCode: ExitCode): Nothing =
