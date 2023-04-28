@@ -7,9 +7,12 @@ import com.github.unix_junkie.dependency_scanner.ExitCode.PACKAGE_ROOT_NONEXISTE
 import org.apache.tika.Tika
 import org.apache.tika.config.TikaConfig
 import java.io.File
+import java.nio.charset.Charset
 import kotlin.system.exitProcess
 
 private val className = {}.javaClass.enclosingClass.name
+
+private val processStreamCharset = Charset.defaultCharset()
 
 fun main(vararg args: String) {
 	if (args.size != 1) {
@@ -36,6 +39,7 @@ private fun scanPackage(packageRoot: File) {
 		}.forEach { file ->
 			val type = contentDetector.detect(file)
 			println("$file -> $type")
+			listDependencies(file)
 		}
 	}
 }
@@ -62,17 +66,40 @@ private fun scanDirectory(directory: File): Sequence<File> {
 	}
 }
 
+private fun listDependencies(file: File) {
+	val ldd = findInPath("ldd").firstOrNull()
+		?: return
+
+	// TODO: clear `LD_PRELOAD` when running `ldd`.
+	val lddProcess = ProcessBuilder(ldd.toString(), file.toString()).start()
+	lddProcess.outputStream.close()
+	val dependencies = lddProcess.inputStream
+		.bufferedReader(processStreamCharset)
+		.readText()
+	val errorOutput = lddProcess.errorStream
+		.bufferedReader(processStreamCharset)
+		.readText()
+	println(dependencies)
+	if (errorOutput.isNotEmpty()) {
+		System.err.println(errorOutput)
+	}
+	val exitCode = lddProcess.waitFor()
+	if (exitCode != 0) {
+		println("ldd exited with code $exitCode for file $file")
+	}
+}
+
 private fun usage() {
 	println("Usage: $className [DIRECTORY]")
 }
 
 private fun exitProcess(exitCode: ExitCode): Nothing =
-		exitProcess(exitCode.ordinal)
+	exitProcess(exitCode.ordinal)
 
 private fun <T> withContentDetector(
-		contentDetector: Tika = Tika(TikaConfig.getDefaultConfig()),
-		action: ContentDetectorAware.() -> T
+	contentDetector: Tika = Tika(TikaConfig.getDefaultConfig()),
+	action: ContentDetectorAware.() -> T
 ): T =
-		object : ContentDetectorAware {
-			override val contentDetector: Tika = contentDetector
-		}.action()
+	object : ContentDetectorAware {
+		override val contentDetector: Tika = contentDetector
+	}.action()
