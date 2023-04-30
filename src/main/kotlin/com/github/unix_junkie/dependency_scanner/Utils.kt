@@ -3,8 +3,9 @@
 package com.github.unix_junkie.dependency_scanner
 
 import com.github.unix_junkie.dependency_scanner.environment.Environment
+import com.github.unix_junkie.dependency_scanner.io.Path
 import com.github.unix_junkie.dependency_scanner.io.div
-import java.io.File
+import com.github.unix_junkie.dependency_scanner.io.safeCanonicalPath
 import java.io.File.pathSeparatorChar
 
 private const val UNIX_LIBRARY_NAME_PREFIX = "lib"
@@ -58,21 +59,20 @@ val String.isUnixLibrary: Boolean
 				&& length > UNIX_LIBRARY_NAME_PREFIX.length + UNIX_LIBRARY_NAME_SUFFIX.length
 				&& subSequence(UNIX_LIBRARY_NAME_PREFIX.length + 1, length).contains(UNIX_LIBRARY_NAME_SUFFIX))
 
-fun findInPath(executable: String): Sequence<File> =
+fun findInPath(executable: String): Sequence<Path> =
 	Environment()["PATH"].orEmpty()
 		.split(pathSeparatorChar)
 		.asSequence()
-		.map(::File)
+		.map(::Path)
 		.flatMap { pathEntry ->
 			executable.toPlatformSpecificExecutableNames()
 				.map { platformSpecificName ->
 					pathEntry / platformSpecificName
 				}
 		}
-		.filter(File::isFile)
-		.filter(File::canExecute)
-		.map(File::getAbsoluteFile)
-		.map(File::normalize)
+		.filter(Path::isFile)
+		.filter(Path::canExecute)
+		.map(Path::safeCanonicalPath)
 		.distinct()
 
 private fun String.toPlatformSpecificExecutableNames(): Sequence<String> =

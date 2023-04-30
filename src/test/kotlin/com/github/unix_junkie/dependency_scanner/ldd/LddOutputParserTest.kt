@@ -1,6 +1,8 @@
 package com.github.unix_junkie.dependency_scanner.ldd
 
+import com.github.unix_junkie.dependency_scanner.io.MSysPathConverter
 import com.github.unix_junkie.dependency_scanner.io.Path
+import com.github.unix_junkie.dependency_scanner.io.normalizedAbsolutePath
 import org.assertj.core.api.Assertions.assertThat
 import kotlin.test.Test
 
@@ -8,16 +10,17 @@ import kotlin.test.Test
  * @see LddOutputParser
  */
 class LddOutputParserTest {
+	private val parser = LddOutputParser(arrayOf(MSysPathConverter()))
+
 	@Test
 	fun unparseable() {
-		assertThat(LddOutputParser.parse("foobar"))
+		assertThat(parser.parse("foobar"))
 			.isInstanceOf(UnparseableLddOutputLine::class.java)
 	}
 
 	@Test
 	fun libraryAtAddress() {
-		val parseResult =
-			LddOutputParser.parse("\tlibc.so.6 => /lib/libc.so.6 (0x7ffc4f4e0000)")
+		val parseResult = parser.parse("\tlibc.so.6 => /lib/libc.so.6 (0x7ffc4f4e0000)")
 		assertThat(parseResult)
 			.isInstanceOf(SharedLibraryWithAbsolutePath::class.java)
 
@@ -26,13 +29,12 @@ class LddOutputParserTest {
 			.isRelative
 			.isEqualTo(Path("libc.so.6"))
 		assertThat(parseResult.absolutePath)
-			.isEqualTo("/lib/libc.so.6")
+			.isEqualTo(Path("/lib/libc.so.6").normalizedAbsolutePath)
 	}
 
 	@Test
 	fun libraryAtUnknownAddress() {
-		val parseResult =
-			LddOutputParser.parse("\tlibc.so.6 => /lib/libc.so.6 (?)")
+		val parseResult = parser.parse("\tlibc.so.6 => /lib/libc.so.6 (?)")
 		assertThat(parseResult)
 			.isInstanceOf(SharedLibraryWithAbsolutePath::class.java)
 
@@ -41,19 +43,18 @@ class LddOutputParserTest {
 			.isRelative
 			.isEqualTo(Path("libc.so.6"))
 		assertThat(parseResult.absolutePath)
-			.isEqualTo("/lib/libc.so.6")
+			.isEqualTo(Path("/lib/libc.so.6").normalizedAbsolutePath)
 	}
 
 	@Test
 	fun unparseableAddress() {
-		assertThat(LddOutputParser.parse("\tlibc.so.6 => /lib/libc.so.6 (unparseable address)"))
+		assertThat(parser.parse("\tlibc.so.6 => /lib/libc.so.6 (unparseable address)"))
 			.isInstanceOf(UnparseableLddOutputLine::class.java)
 	}
 
 	@Test
 	fun notFound() {
-		val parseResult =
-			LddOutputParser.parse("\tlibc.so.6 => not found")
+		val parseResult = parser.parse("\tlibc.so.6 => not found")
 		assertThat(parseResult)
 			.isInstanceOf(NotFound::class.java)
 
@@ -65,8 +66,7 @@ class LddOutputParserTest {
 
 	@Test
 	fun virtualSharedLibrary() {
-		val parseResult =
-			LddOutputParser.parse("\tlinux-vdso.so.1 (0x7ffc4f4e0000)")
+		val parseResult = parser.parse("\tlinux-vdso.so.1 (0x7ffc4f4e0000)")
 		assertThat(parseResult)
 			.isInstanceOf(VirtualSharedLibrary::class.java)
 
@@ -78,8 +78,7 @@ class LddOutputParserTest {
 
 	@Test
 	fun libraryInterpreter() {
-		val parseResult =
-			LddOutputParser.parse("\t/lib64/ld-linux-x86-64.so.2 (0x7ffc4f4e0000)")
+		val parseResult = parser.parse("\t/lib64/ld-linux-x86-64.so.2 (0x7ffc4f4e0000)")
 		assertThat(parseResult)
 			.isInstanceOf(LibraryInterpreter::class.java)
 

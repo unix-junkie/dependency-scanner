@@ -1,9 +1,11 @@
 package com.github.unix_junkie.dependency_scanner.ldd
 
 import com.github.unix_junkie.dependency_scanner.io.Path
+import com.github.unix_junkie.dependency_scanner.io.PathConverter
+import com.github.unix_junkie.dependency_scanner.io.normalizedAbsolutePath
 import com.github.unix_junkie.dependency_scanner.isLibrary
 
-object LddOutputParser {
+class LddOutputParser(private val converters: Array<out PathConverter>) {
 	private val LDD_OUTPUT = Regex("""^\s*(\S+)\s*(?:=>\s*(?:(not found)|([^\s()].+?[^\s()])))?(?:\s+\(\s*(?:\?|0x[0-9A-Fa-f]+)\s*\))?\s*$""")
 
 	fun parse(line: String): LddOutputLine {
@@ -30,22 +32,43 @@ object LddOutputParser {
 							line
 						}
 
-						NotFound(Path(fileName))
+						NotFound(fileName.toPath())
 					}
 
-					fileName.isAbsolute -> LibraryInterpreter(Path(fileName))
+					fileName.isAbsolute -> LibraryInterpreter(fileName.toPath())
 
 					else -> when {
-						fileName.isLibrary -> VirtualSharedLibrary(Path(fileName))
+						fileName.isLibrary -> VirtualSharedLibrary(fileName.toPath())
 
 						else -> UnparseableLddOutputLine(line)
 					}
 				}
 
-				else -> SharedLibraryWithAbsolutePath(Path(fileName), absolutePath)
+				/*-
+				 * We don't resolve symlinks here but rather
+				 * just normalize the paths, so that the returned
+				 * path looks like
+				 *
+				 * /usr/lib/libstdc++.so.6
+				 *
+				 * and not like
+				 *
+				 * /usr/lib/libstdc++.so.6.0.28
+				 */
+				else -> SharedLibraryWithAbsolutePath(
+					fileName.toPath(),
+					absolutePath.toPath().normalizedAbsolutePath,
+				)
 			}
 		}
 	}
+
+	private fun String.toPath(): Path =
+		converters.asSequence()
+			.filter(PathConverter::isEnabled)
+			.firstOrNull()
+			?.convert(this)
+			?: Path(this)
 }
 
 sealed interface LddOutputLine
@@ -84,7 +107,7 @@ data class LibraryInterpreter(override val fileName: Path) : SharedLibrary {
 
 data class SharedLibraryWithAbsolutePath(
 	override val fileName: Path,
-	val absolutePath: String,
+	val absolutePath: Path,
 ) : SharedLibrary {
 	override fun toString(): String =
 		"$fileName => $absolutePath"

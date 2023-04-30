@@ -4,9 +4,12 @@ package com.github.unix_junkie.dependency_scanner
 
 import com.github.unix_junkie.dependency_scanner.ExitCode.ILLEGAL_ARGS
 import com.github.unix_junkie.dependency_scanner.ExitCode.PACKAGE_ROOT_NONEXISTENT
+import com.github.unix_junkie.dependency_scanner.io.MSysPathConverter
 import com.github.unix_junkie.dependency_scanner.io.Path
+import com.github.unix_junkie.dependency_scanner.io.safeIsSameFileAs
 import com.github.unix_junkie.dependency_scanner.ldd.LddOutputParser
 import com.github.unix_junkie.dependency_scanner.ldd.LibraryInterpreter
+import com.github.unix_junkie.dependency_scanner.ldd.SharedLibraryWithAbsolutePath
 import com.github.unix_junkie.dependency_scanner.ldd.UnparseableLddOutputLine
 import com.github.unix_junkie.dependency_scanner.ldd.VirtualSharedLibrary
 import java.nio.charset.Charset
@@ -72,6 +75,8 @@ private fun listDependencies(file: Path) {
 	val ldd = findInPath("ldd").firstOrNull()
 		?: return
 
+	val parser = LddOutputParser(arrayOf(MSysPathConverter()))
+
 	// TODO: clear `LD_PRELOAD` when running `ldd`.
 	val lddProcess = ProcessBuilder(ldd.toString(), file.toString()).start()
 	lddProcess.outputStream.close()
@@ -80,12 +85,19 @@ private fun listDependencies(file: Path) {
 		.use { stdout ->
 			val dependencies = stdout
 				.lineSequence()
-				.map(LddOutputParser::parse)
+				.map(parser::parse)
 				.filterNot { dependency ->
 					dependency is VirtualSharedLibrary
 				}
 				.filterNot { dependency ->
 					dependency is LibraryInterpreter
+				}
+				.filterNot { dependency ->
+					/*
+					 * Exclude dependencies pointing to self.
+					 */
+					dependency is SharedLibraryWithAbsolutePath
+							&& dependency.absolutePath.safeIsSameFileAs(file)
 				}
 				.distinct()
 			dependencies.forEach { dependency ->
