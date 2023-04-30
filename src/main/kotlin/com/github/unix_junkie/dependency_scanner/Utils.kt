@@ -7,6 +7,10 @@ import com.github.unix_junkie.dependency_scanner.io.div
 import java.io.File
 import java.io.File.pathSeparatorChar
 
+private const val UNIX_LIBRARY_NAME_PREFIX = "lib"
+
+private const val UNIX_LIBRARY_NAME_SUFFIX = ".so"
+
 private val DEFAULT_EXECUTABLE_EXTENSIONS: Array<out String> = arrayOf(
 	".com",
 	".exe",
@@ -33,6 +37,26 @@ val executableExtensions: Array<out String> by lazy {
 val isWindows: Boolean
 	get() =
 		System.getProperty("os.name").startsWith("Windows ")
+
+val String.isLibrary: Boolean
+	get() =
+		isWindowsLibrary || isUnixLibrary
+
+val String.isWindowsExecutable: Boolean
+	get() =
+		endsWith(".exe", ignoreCase = true)
+
+val String.isWindowsLibrary: Boolean
+	get() =
+		endsWith(".dll", ignoreCase = true)
+
+val String.isUnixLibrary: Boolean
+	get() =
+		startsWith("ld-linux")
+				|| startsWith("linux-vdso")
+				|| (startsWith(UNIX_LIBRARY_NAME_PREFIX)
+				&& length > UNIX_LIBRARY_NAME_PREFIX.length + UNIX_LIBRARY_NAME_SUFFIX.length
+				&& subSequence(UNIX_LIBRARY_NAME_PREFIX.length + 1, length).contains(UNIX_LIBRARY_NAME_SUFFIX))
 
 fun findInPath(executable: String): Sequence<File> =
 	Environment()["PATH"].orEmpty()

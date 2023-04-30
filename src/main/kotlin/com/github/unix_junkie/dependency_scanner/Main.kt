@@ -5,16 +5,16 @@ package com.github.unix_junkie.dependency_scanner
 import com.github.unix_junkie.dependency_scanner.ExitCode.ILLEGAL_ARGS
 import com.github.unix_junkie.dependency_scanner.ExitCode.PACKAGE_ROOT_NONEXISTENT
 import com.github.unix_junkie.dependency_scanner.io.Path
-import org.apache.tika.Tika
-import org.apache.tika.config.TikaConfig
+import com.github.unix_junkie.dependency_scanner.ldd.LddOutputParser
+import com.github.unix_junkie.dependency_scanner.ldd.LibraryInterpreter
+import com.github.unix_junkie.dependency_scanner.ldd.UnparseableLddOutputLine
+import com.github.unix_junkie.dependency_scanner.ldd.VirtualSharedLibrary
 import java.nio.charset.Charset
 import kotlin.system.exitProcess
 
 private val CLASS_NAME = {}.javaClass.enclosingClass.name
 
 private val PROCESS_STREAM_CHARSET = Charset.defaultCharset()
-
-private val LDD_OUTPUT = Regex("""^\s*(\S+)\s*(?:=>\s*(not found|(\S.+?\S)))?(?:\s+\(\s*(?:\?|0x[0-9A-Fa-f]+)\s*\))?\s*$""")
 
 fun main(vararg args: String) {
 	if (args.size != 1) {
@@ -75,13 +75,34 @@ private fun listDependencies(file: Path) {
 	// TODO: clear `LD_PRELOAD` when running `ldd`.
 	val lddProcess = ProcessBuilder(ldd.toString(), file.toString()).start()
 	lddProcess.outputStream.close()
-	val dependencies = lddProcess.inputStream
+	lddProcess.inputStream
 		.bufferedReader(PROCESS_STREAM_CHARSET)
-		.readText()
+		.use { stdout ->
+			val dependencies = stdout
+				.lineSequence()
+				.map(LddOutputParser::parse)
+				.filterNot { dependency ->
+					dependency is VirtualSharedLibrary
+				}
+				.filterNot { dependency ->
+					dependency is LibraryInterpreter
+				}
+				.distinct()
+			dependencies.forEach { dependency ->
+				when (dependency) {
+					is UnparseableLddOutputLine -> System.err.println(
+						"Unexpected ldd output: ${dependency.line}"
+					)
+
+					else -> println("\t" + dependency)
+				}
+			}
+		}
 	val errorOutput = lddProcess.errorStream
 		.bufferedReader(PROCESS_STREAM_CHARSET)
-		.readText()
-	println(dependencies)
+		.use { stderr ->
+			stderr.readText()
+		}
 	if (errorOutput.isNotEmpty()) {
 		System.err.println(errorOutput)
 	}
@@ -97,11 +118,3 @@ private fun usage() {
 
 private fun exitProcess(exitCode: ExitCode): Nothing =
 	exitProcess(exitCode.ordinal)
-
-private fun <T> withContentDetector(
-	contentDetector: Tika = Tika(TikaConfig.getDefaultConfig()),
-	action: ContentDetectorAware.() -> T
-): T =
-	object : ContentDetectorAware {
-		override val contentDetector: Tika = contentDetector
-	}.action()
