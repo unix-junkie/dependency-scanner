@@ -9,9 +9,11 @@ import com.github.unix_junkie.dependency_scanner.io.Path
 import com.github.unix_junkie.dependency_scanner.io.fileName
 import com.github.unix_junkie.dependency_scanner.io.isChildOf
 import com.github.unix_junkie.dependency_scanner.io.safeIsSameFileAs
+import com.github.unix_junkie.dependency_scanner.ldd.LddOutputLine
 import com.github.unix_junkie.dependency_scanner.ldd.LddOutputParser
 import com.github.unix_junkie.dependency_scanner.ldd.LibraryInterpreter
 import com.github.unix_junkie.dependency_scanner.ldd.NotFound
+import com.github.unix_junkie.dependency_scanner.ldd.SharedLibrary
 import com.github.unix_junkie.dependency_scanner.ldd.SharedLibraryWithAbsolutePath
 import com.github.unix_junkie.dependency_scanner.ldd.UnparseableLddOutputLine
 import com.github.unix_junkie.dependency_scanner.ldd.VirtualSharedLibrary
@@ -35,6 +37,7 @@ fun main(vararg args: String) {
 			packageRoot,
 			Options(
 				listInternalDependencies = false,
+				mergeDependencies = true,
 			),
 		)
 
@@ -62,15 +65,44 @@ private fun scanPackage(
 				.toSet(),
 		)
 
-		files.forEach { file ->
-			val type = contentDetector.detect(file)
-			println("$file -> $type")
-			listDependencies(
-				file,
-				ctx,
-				options,
-			)
+		val mergedDependencies = sequence {
+			files.forEach { file ->
+				if (!options.mergeDependencies) {
+					val type = contentDetector.detect(file)
+					println("$file -> $type")
+				}
+
+				val dependencies = listDependencies(
+					file,
+					ctx,
+					options,
+				)
+					.asSequence()
+					.onEach { dependency ->
+						if (dependency is UnparseableLddOutputLine) {
+							System.err.println("Unexpected ldd output for $file: ${dependency.line}")
+						}
+					}
+					.filterIsInstance<SharedLibrary>()
+
+				when {
+					options.mergeDependencies -> yieldAll(dependencies)
+
+					else -> dependencies.forEach { dependency ->
+						println("\t" + dependency)
+					}
+				}
+			}
+		}.distinct()
+
+		mergedDependencies.onEach { dependency ->
+			if (dependency !is SharedLibraryWithAbsolutePath) {
+				println(dependency)
+			}
 		}
+			.filterIsInstance<SharedLibraryWithAbsolutePath>()
+			.sortedBy(SharedLibraryWithAbsolutePath::absolutePath)
+			.forEach(::println)
 	}
 }
 
@@ -100,20 +132,19 @@ private fun listDependencies(
 	file: Path,
 	ctx: Context,
 	options: Options,
-) {
+): List<LddOutputLine> {
 	val ldd = findInPath("ldd").firstOrNull()
-		?: return
+		?: return emptyList()
 
 	val parser = LddOutputParser(arrayOf(MSysPathConverter()))
 
 	// TODO: clear `LD_PRELOAD` when running `ldd`.
 	val lddProcess = ProcessBuilder(ldd.toString(), file.toString()).start()
 	lddProcess.outputStream.close()
-	lddProcess.inputStream
+	val dependencies = lddProcess.inputStream
 		.bufferedReader(PROCESS_STREAM_CHARSET)
 		.use { stdout ->
-			val dependencies = stdout
-				.lineSequence()
+			stdout.lineSequence()
 				.map(parser::parse)
 				.filterNot { dependency ->
 					dependency is VirtualSharedLibrary
@@ -139,15 +170,7 @@ private fun listDependencies(
 							&& dependency.fileName in ctx.fileNames
 				}
 				.distinct()
-			dependencies.forEach { dependency ->
-				when (dependency) {
-					is UnparseableLddOutputLine -> System.err.println(
-						"Unexpected ldd output for $file: ${dependency.line}"
-					)
-
-					else -> println("\t" + dependency)
-				}
-			}
+				.toList()
 		}
 	val errorOutput = lddProcess.errorStream
 		.bufferedReader(PROCESS_STREAM_CHARSET)
@@ -159,8 +182,10 @@ private fun listDependencies(
 	}
 	val exitCode = lddProcess.waitFor()
 	if (exitCode != 0) {
-		println("ldd exited with code $exitCode for file $file")
+		System.err.println("ldd exited with code $exitCode for: $file")
 	}
+
+	return dependencies
 }
 
 private fun usage() {

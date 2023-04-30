@@ -6,4 +6,5 @@ package com.github.unix_junkie.dependency_scanner
  */
 data class Options(
 	val listInternalDependencies: Boolean,
+	val mergeDependencies: Boolean,
 )
