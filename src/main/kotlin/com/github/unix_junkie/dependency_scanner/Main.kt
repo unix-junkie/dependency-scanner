@@ -6,9 +6,12 @@ import com.github.unix_junkie.dependency_scanner.ExitCode.ILLEGAL_ARGS
 import com.github.unix_junkie.dependency_scanner.ExitCode.PACKAGE_ROOT_NONEXISTENT
 import com.github.unix_junkie.dependency_scanner.io.MSysPathConverter
 import com.github.unix_junkie.dependency_scanner.io.Path
+import com.github.unix_junkie.dependency_scanner.io.fileName
+import com.github.unix_junkie.dependency_scanner.io.isChildOf
 import com.github.unix_junkie.dependency_scanner.io.safeIsSameFileAs
 import com.github.unix_junkie.dependency_scanner.ldd.LddOutputParser
 import com.github.unix_junkie.dependency_scanner.ldd.LibraryInterpreter
+import com.github.unix_junkie.dependency_scanner.ldd.NotFound
 import com.github.unix_junkie.dependency_scanner.ldd.SharedLibraryWithAbsolutePath
 import com.github.unix_junkie.dependency_scanner.ldd.UnparseableLddOutputLine
 import com.github.unix_junkie.dependency_scanner.ldd.VirtualSharedLibrary
@@ -28,7 +31,12 @@ fun main(vararg args: String) {
 	val packageRoot = Path(args[0])
 
 	when {
-		packageRoot.isDirectory -> scanPackage(packageRoot)
+		packageRoot.isDirectory -> scanPackage(
+			packageRoot,
+			Options(
+				listInternalDependencies = false,
+			),
+		)
 
 		else -> {
 			println("Not a directory: $packageRoot")
@@ -37,14 +45,31 @@ fun main(vararg args: String) {
 	}
 }
 
-private fun scanPackage(packageRoot: Path) {
+private fun scanPackage(
+	packageRoot: Path,
+	options: Options,
+) {
 	withContentDetector {
-		scanDirectory(packageRoot).filter { file ->
+		val files = scanDirectory(packageRoot).filter { file ->
 			file.isExecutable || file.isLibrary
-		}.forEach { file ->
+		}.toList()
+
+		val ctx = Context(
+			packageRoot,
+			fileNames = files.asSequence()
+				.map(Path::fileName)
+				.filterNotNull()
+				.toSet(),
+		)
+
+		files.forEach { file ->
 			val type = contentDetector.detect(file)
 			println("$file -> $type")
-			listDependencies(file)
+			listDependencies(
+				file,
+				ctx,
+				options,
+			)
 		}
 	}
 }
@@ -71,7 +96,11 @@ private fun scanDirectory(directory: Path): Sequence<Path> {
 	}
 }
 
-private fun listDependencies(file: Path) {
+private fun listDependencies(
+	file: Path,
+	ctx: Context,
+	options: Options,
+) {
 	val ldd = findInPath("ldd").firstOrNull()
 		?: return
 
@@ -99,11 +128,21 @@ private fun listDependencies(file: Path) {
 					dependency is SharedLibraryWithAbsolutePath
 							&& dependency.absolutePath.safeIsSameFileAs(file)
 				}
+				.filterNot { dependency ->
+					!options.listInternalDependencies &&
+							dependency is SharedLibraryWithAbsolutePath
+							&& dependency.absolutePath.isChildOf(ctx.packageRoot)
+				}
+				.filterNot { dependency ->
+					!options.listInternalDependencies
+							&& dependency is NotFound
+							&& dependency.fileName in ctx.fileNames
+				}
 				.distinct()
 			dependencies.forEach { dependency ->
 				when (dependency) {
 					is UnparseableLddOutputLine -> System.err.println(
-						"Unexpected ldd output: ${dependency.line}"
+						"Unexpected ldd output for $file: ${dependency.line}"
 					)
 
 					else -> println("\t" + dependency)
