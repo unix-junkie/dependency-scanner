@@ -71,48 +71,6 @@ class LddOutputParser(private val converters: Array<out PathConverter>) {
 			?: Path(this)
 }
 
-sealed interface LddOutputLine
-
-data class UnparseableLddOutputLine(val line: String) : LddOutputLine
-
-sealed interface SharedLibrary : LddOutputLine {
-	/**
-	 * The file name of the library. This path is always relative, except
-	 * for the case of a [LibraryInterpreter].
-	 */
-	val fileName: Path
-}
-
-data class NotFound(override val fileName: Path) : SharedLibrary {
-	override fun toString(): String =
-		"$fileName => not found"
-}
-
-/**
- * `linux-vdso.so.1`
- */
-data class VirtualSharedLibrary(override val fileName: Path) : SharedLibrary {
-	override fun toString(): String =
-		"$fileName (virtual dynamic shared object)"
-}
-
-/**
- * `/lib64/ld-linux-x86-64.so.2`
- */
-data class LibraryInterpreter(override val fileName: Path) : SharedLibrary {
-	override fun toString(): String =
-		"$fileName (library interpreter)"
-}
-
-
-data class SharedLibraryWithAbsolutePath(
-	override val fileName: Path,
-	val absolutePath: Path,
-) : SharedLibrary {
-	override fun toString(): String =
-		"$fileName => $absolutePath"
-}
-
 /**
  * @return `true` if this is an absolute UNIX path.
  */
