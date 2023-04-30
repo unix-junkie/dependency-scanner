@@ -4,9 +4,9 @@ package com.github.unix_junkie.dependency_scanner
 
 import com.github.unix_junkie.dependency_scanner.ExitCode.ILLEGAL_ARGS
 import com.github.unix_junkie.dependency_scanner.ExitCode.PACKAGE_ROOT_NONEXISTENT
+import com.github.unix_junkie.dependency_scanner.io.Path
 import org.apache.tika.Tika
 import org.apache.tika.config.TikaConfig
-import java.io.File
 import java.nio.charset.Charset
 import kotlin.system.exitProcess
 
@@ -22,7 +22,7 @@ fun main(vararg args: String) {
 		exitProcess(ILLEGAL_ARGS)
 	}
 
-	val packageRoot = File(args[0])
+	val packageRoot = Path(args[0])
 
 	when {
 		packageRoot.isDirectory -> scanPackage(packageRoot)
@@ -34,7 +34,7 @@ fun main(vararg args: String) {
 	}
 }
 
-private fun scanPackage(packageRoot: File) {
+private fun scanPackage(packageRoot: Path) {
 	withContentDetector {
 		scanDirectory(packageRoot).filter { file ->
 			file.isExecutable || file.isLibrary
@@ -49,7 +49,7 @@ private fun scanPackage(packageRoot: File) {
 /**
  * @return the sequence of regular files which are children of [directory].
  */
-private fun scanDirectory(directory: File): Sequence<File> {
+private fun scanDirectory(directory: Path): Sequence<Path> {
 	check(directory.isDirectory)
 
 	val children = directory.listFiles()
@@ -58,17 +58,17 @@ private fun scanDirectory(directory: File): Sequence<File> {
 
 	return sequence {
 		yieldAll(children.asSequence()
-				.filter(File::isDirectory)
-				.sortedBy(File::getName)
+				.filter(Path::isDirectory)
+				.sortedBy(Path::getName)
 				.flatMap(::scanDirectory))
 
 		yieldAll(children.asSequence()
-				.filter(File::isFile)
-				.sortedBy(File::getName))
+				.filter(Path::isFile)
+				.sortedBy(Path::getName))
 	}
 }
 
-private fun listDependencies(file: File) {
+private fun listDependencies(file: Path) {
 	val ldd = findInPath("ldd").firstOrNull()
 		?: return
 

@@ -1,32 +1,32 @@
 package com.github.unix_junkie.dependency_scanner
 
+import com.github.unix_junkie.dependency_scanner.io.Path
 import org.apache.tika.Tika
-import java.io.File
 
 interface ContentDetectorAware {
 	val contentDetector: Tika
 
-	val File.isExecutable: Boolean
+	val Path.isExecutable: Boolean
 		get() =
 			isWindowsExecutable || isUnixExecutable
 
-	val File.isLibrary: Boolean
+	val Path.isLibrary: Boolean
 		get() =
 			isWindowsLibrary || isUnixLibrary
 
-	val File.isWindowsExecutable: Boolean
+	val Path.isWindowsExecutable: Boolean
 		get() =
 			name.endsWith(".exe", ignoreCase = true)
 
-	val File.isWindowsLibrary: Boolean
+	val Path.isWindowsLibrary: Boolean
 		get() =
 			name.endsWith(".dll", ignoreCase = true)
 
-	val File.isUnixExecutable: Boolean
+	val Path.isUnixExecutable: Boolean
 		get() =
 			isUnixExecutableOrLibrary && !isUnixLibrary
 
-	val File.isUnixLibrary: Boolean
+	val Path.isUnixLibrary: Boolean
 		get() {
 			val name = name
 			return name.startsWith(UNIX_LIBRARY_NAME_PREFIX)
@@ -35,7 +35,7 @@ interface ContentDetectorAware {
 					&& isUnixExecutableOrLibrary
 		}
 
-	val File.isUnixExecutableOrLibrary: Boolean
+	val Path.isUnixExecutableOrLibrary: Boolean
 		get() =
 			contentDetector.detect(this) == "application/x-sharedlib"
 
