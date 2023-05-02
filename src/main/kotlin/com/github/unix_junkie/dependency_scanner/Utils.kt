@@ -19,6 +19,12 @@ private val DEFAULT_EXECUTABLE_EXTENSIONS: Array<out String> = arrayOf(
 	".cmd",
 )
 
+private val SPECIAL_UNIX_LIBRARY_PREFIXES: Array<out String> = arrayOf(
+	"ld-linux",
+	"linux-vdso",
+	"linux-gate",
+)
+
 val executableExtensions: Array<out String> by lazy {
 	when {
 		isWindows -> {
@@ -53,11 +59,14 @@ val String.isWindowsLibrary: Boolean
 
 val String.isUnixLibrary: Boolean
 	get() =
-		startsWith("ld-linux")
-				|| startsWith("linux-vdso")
+		isSpecialUnixLibrary
 				|| (startsWith(UNIX_LIBRARY_NAME_PREFIX)
 				&& length > UNIX_LIBRARY_NAME_PREFIX.length + UNIX_LIBRARY_NAME_SUFFIX.length
 				&& subSequence(UNIX_LIBRARY_NAME_PREFIX.length + 1, length).contains(UNIX_LIBRARY_NAME_SUFFIX))
+
+private val String.isSpecialUnixLibrary: Boolean
+	get() =
+		SPECIAL_UNIX_LIBRARY_PREFIXES.any(this::startsWith)
 
 fun findInPath(executable: String): Sequence<Path> =
 	Environment()["PATH"].orEmpty()
